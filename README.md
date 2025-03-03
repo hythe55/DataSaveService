@@ -141,3 +141,9 @@ The `ProfileRemoving` event will fire right before a Profile gets removed. This 
 DataSaveService.ProfileRemoved:Connect(function(player: Playerm profile: Profile)
 ```
 The `ProfileRemoved` event fires right after a Profile is removed. This may fire on server shutdown causing code to not run before it closes.
+
+
+## Classes
+[ProfileStore](https://madstudioroblox.github.io/ProfileStore/api/#profilestore)
+
+[Profile](https://madstudioroblox.github.io/ProfileStore/api/#profile)
