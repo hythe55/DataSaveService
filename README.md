@@ -119,6 +119,8 @@ Returns the key based on the provided UserId.
 | ----------- | ----------- | ----------- |
 | `userId` | `number` | The `UserId` to be used for the key. |
 
+### Returns
+`nil`
 
 
 
