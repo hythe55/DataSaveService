@@ -148,7 +148,7 @@ DataSaveService.ProfileRemoved:Connect(function(player: Player)
   local profile = DataSaveService:GetProfile(player)
 end)
 ```
-The `ProfileRemoved` event fires right after a Profile is removed. This may fire on server shutdown causing code to not run before it closes.
+The `ProfileRemoved` event fires right after a Profile is removed and released. This may fire on server shutdown causing code to not run before it closes.
 
 
 ## Classes
