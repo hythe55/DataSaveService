@@ -128,19 +128,25 @@ Returns the key based on the provided UserId.
 ## Events
 ### ProfileAdded
 ```
-DataSaveService.ProfileAdded:Connect(function(player: Player, profile: Profile)
+DataSaveService.ProfileAdded:Connect(function(player: Player)
+  local profile = DataSaveService:GetProfile(player)
+end)
 ```
 The `ProfileAdded` event will fire when a new `Profile` is added.
 
 ### ProfileRemoving
 ```
-DataSaveService.ProfileRemoving:Connect(function(player: Player, profile: Profile)
+DataSaveService.ProfileRemoving:Connect(function(player: Player)
+  local profile = DataSaveService:GetProfile(player)
+end)
 ```
 The `ProfileRemoving` event will fire right before a Profile gets removed. This may fire on server shutdown causing code to not run before it closes.
 
 ### ProfileRemoved
 ```
-DataSaveService.ProfileRemoved:Connect(function(player: Playerm profile: Profile)
+DataSaveService.ProfileRemoved:Connect(function(player: Player)
+  local profile = DataSaveService:GetProfile(player)
+end)
 ```
 The `ProfileRemoved` event fires right after a Profile is removed. This may fire on server shutdown causing code to not run before it closes.
 
