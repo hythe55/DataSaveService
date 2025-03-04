@@ -47,7 +47,7 @@ If no name is set DataSaveService defaults to using **MAIN_PROFILE**.
 | `storeName` | `string` | The name to set `ProfileStore` to. |
 
 #### Returns
-`nil`
+`{any}`
 
 
 ### SetProfileKeyTemplate
