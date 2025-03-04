@@ -57,6 +57,9 @@ end
 --[[Waits for a profile to be loaded.
 Returns nil if player leaves before the profile is loaded.]]
 function DataSaveService:WaitForProfile(player: Player): ProfileService.Profile?
+	if not Players:FindFirstChild(player.Name) then
+		return
+	end
 	local playerLeft = false
 	local connection = Players.PlayerRemoving:Connect(function(playerLeaving)
 		if playerLeaving == player then
