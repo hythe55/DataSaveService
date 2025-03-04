@@ -13,12 +13,17 @@ local Profiles: {[Player]: ProfileService.Profile} = {}
 local silentMode = false
 local p = print
 
-type ProfileSignal = {
+script:SetAttribute("ProfileStoreCreated", false)
+
+export type ProfileSignal = {
 	Connect: (self: ProfileSignal, (player: Player) -> ()) -> RBXScriptConnection,
 	Once: (self: ProfileSignal, (player: Player) -> ()) -> RBXScriptConnection,
 	Wait: (self: ProfileSignal, (player: Player) -> ()) -> RBXScriptConnection,
 	ConnectParallel: (self: ProfileSignal, (player: Player) -> ()) -> RBXScriptConnection
 }
+
+export type ProfileStore = ProfileService.ProfileStore
+export type Profile = ProfileService.Profile
 
 --Creates communication folder and remote events
 local function startup()
@@ -76,12 +81,14 @@ end
 --[[Returns the profile store.
 Yields until DataSaveService:CreateProfileStore() is called.]]
 function DataSaveService:GetProfileStore(): ProfileService.ProfileStore
-	assert(ProfileStore, "DataSaveService:CreateProfileStore() must be called before getting the ProfileStore")
+	if script:GetAttribute("ProfileStoreCreated") == false then
+		script:GetAttributeChangedSignal("ProfileStoreCreated"):Wait()
+	end
 	return ProfileStore
 end
 
 --[[Returns a dictionary of all profiles with <strong>player</strong> being used as the key.]]
-function DataSaveService:GetProfiles(): {ProfileService.Profile}
+function DataSaveService:GetProfiles(): {[Player]: ProfileService.Profile}
 	return Profiles
 end
 
@@ -102,6 +109,28 @@ end
 function DataSaveService:GetTemplate(): {any}
 	assert(ProfileTemplate, "Profile template has not been created.")
 	return ProfileTemplate
+end
+
+--[[Adds a dictionary into the ProfileTemplate.
+The location should be seperated using peroids.
+If only the index name is provided in <strong>location</strong> the value with be placed directly into Template.
+More information can be found on the documentation.]]
+function DataSaveService:AddToTemplate(location: string, value: any)
+	assert(ProfileTemplate, "Default Profile template must first be created.")
+	local currentLocation = ProfileTemplate
+	for i,v in string.split(location, ".") do
+		if currentLocation[v] then
+			currentLocation = currentLocation[v]
+			continue
+		else
+			currentLocation[v] = value
+			for i, profile in DataSaveService:GetProfiles() do
+				profile:Reconcile()
+			end
+			return
+		end
+	end
+	error("Attempted to replace existing location.")
 end
 
 --[[Sets the name of the ProfileStore.
@@ -128,14 +157,14 @@ function DataSaveService:CreateProfileStore(): ProfileService.ProfileStore
 	assert(ProfileTemplate, "Profile template has not be set using DataSaveService:SetTemplate().")
 	assert(not ProfileStore, "DataSave has already been created.")
 	ProfileStore = ProfileService.New(ProfileName, ProfileTemplate)
-	
+
 	local function loadProfile(player: Player)
 		local profile = ProfileStore:StartSessionAsync(DataSaveService:GetProfileKey(player.UserId), {
 			Cancel = function()
 				return player.Parent ~= Players
 			end,
 		})
-		
+
 		if profile then
 			profile:AddUserId(player.UserId)
 			profile:Reconcile()
@@ -173,7 +202,7 @@ function DataSaveService:CreateProfileStore(): ProfileService.ProfileStore
 			script.Communication.ProfileRemoved:Fire(player)
 		end
 	end
-	
+
 	for i, player in Players:GetPlayers() do
 		task.spawn(loadProfile, player)
 	end
@@ -184,6 +213,11 @@ function DataSaveService:CreateProfileStore(): ProfileService.ProfileStore
 		removeProfile(player)
 	end)
 end
+
+--[[If the player's most recent save falls within the times given their Profile will revert to closest save to <strong>revertTime</strong> that falls before the time given in <strong>revertTime</strong>.]]
+--[[function DataSaveService:RevertProfile(startTime: number, endTime: number, revertTime: number)
+	--will just do this whenever i feel its needed
+end]]
 
 startup()
 DataSaveService.ProfileAdded = script.Communication.ProfileAdded.Event:: ProfileSignal
