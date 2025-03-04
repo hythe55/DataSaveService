@@ -124,7 +124,7 @@ Returns the key based on the provided UserId.
 
 
 ### AddToTemplate
-Adds a dictionary into the `ProfileTemplate`.
+Adds a dictionary into the `ProfileTemplate`. All Profiles have `Profile:Reconcile()` called on them.
 
 #### Parameters
 | Paremeter | Type | Description | 
@@ -152,6 +152,9 @@ Template = {
     ExampleAddition = {5, 6}
 }
 ```
+
+#### Returns
+`nil`
 
 ## Events
 ### ProfileAdded
