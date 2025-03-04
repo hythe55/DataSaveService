@@ -123,7 +123,35 @@ Returns the key based on the provided UserId.
 `nil`
 
 
+### AddToTemplate
+Adds a dictionary into the `ProfileTemplate`.
 
+#### Parameters
+| Paremeter | Type | Description | 
+| ----------- | ------------ | ----------- |
+| `location` | `string` | The location for data to be added to `ProfileTemplate`. Locations should be separated using periods. |
+| `value` | `any` | The data to be added at `location`. |
+
+#### Examples
+```
+Template = {
+    Example = {1, 2}
+}
+
+DataSaveService:AddToTemplate("ExampleAddition", {5, 6})
+--ExampleAddition gets added to Template.
+Template = {
+    Example = {Hello = "Goodbye"},
+    ExampleAddition = {5, 6}
+}
+
+DataSaveService:AddToTemplate("Example.AnotherExample", {"Data"})
+--AnotherExample gets added to Template.Example
+Template = {
+    Example = {Hello = "Goodbye", AnotherExample = {"Data"}},
+    ExampleAddition = {5, 6}
+}
+```
 
 ## Events
 ### ProfileAdded
