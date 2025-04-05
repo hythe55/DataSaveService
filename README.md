@@ -10,7 +10,7 @@ Silent mode toggles print statements from DataSaveService in the output.
 Errors and warnings will always be visible.
 
 #### Parameters
-| Paremeter | Type | Description | 
+| Parameter | Type | Description | 
 | ----------- | ----------- | ----------- |
 | `enabled` | `boolean?` | Sets silent mode to `enabled`. |
 
@@ -23,7 +23,7 @@ Errors and warnings will always be visible.
 Sets the template for `Profile:Reconcile()`.
 
 #### Parameters
-| Paremeter | Type | Description | 
+| Parameter | Type | Description | 
 | ----------- | ----------- | ----------- |
 | `template` | `{any}` | The table to set the `ProfileStore`'s template to. |
 
@@ -42,7 +42,7 @@ Sets the name of the `ProfileStore`.
 If no name is set DataSaveService defaults to using **MAIN_PROFILE**.
 
 #### Parameters
-| Paremeter | Type | Description | 
+| Parameter | Type | Description | 
 | ----------- | ----------- | ----------- |
 | `storeName` | `string` | The name to set `ProfileStore` to. |
 
@@ -56,7 +56,7 @@ Sets the template for Profile keys to follow.
 If no template is set DataSaveService will default to "%s".
 
 #### Parameters
-| Paremeter | Type | Description | 
+| Parameter | Type | Description | 
 | ----------- | ----------- | ----------- |
 | `keyTemplate` | `string` | The template to use for keys. |
 
@@ -84,7 +84,7 @@ Returns the `ProfileStore`. Yields until `DataSaveService:CreateProfileStore()` 
 Returns the `Profile` associated with the `Player`. Returns nil if no `Profile` is found.
 
 #### Parameters
-| Paremeter | Type | Description | 
+| Parameter | Type | Description | 
 | ----------- | ----------- | ----------- |
 | `player` | `Player` | The `Player` to find the `Profile` of. |
 
@@ -96,7 +96,7 @@ Returns the `Profile` associated with the `Player`. Returns nil if no `Profile` 
 Yields until the Profile for `player` is found. Returns `nil` if `player` leaves before their `Profile` loads.
 
 #### Parameters
-| Paremeter | Type | Description | 
+| Parameter | Type | Description | 
 | ----------- | ----------- | ----------- |
 | `player` | `Player` | The `Player` to find and wait for the `Profile` of. |
 
@@ -115,7 +115,7 @@ Returns a table of all of the `Profiles` currently loaded with `Player` used as 
 Returns the key based on the provided UserId.
 
 #### Parameters
-| Paremeter | Type | Description | 
+| Parameter | Type | Description | 
 | ----------- | ----------- | ----------- |
 | `userId` | `number` | The `UserId` to be used for the key. |
 
@@ -127,7 +127,7 @@ Returns the key based on the provided UserId.
 Adds a dictionary into the `ProfileTemplate`. All Profiles have `Profile:Reconcile()` called on them.
 
 #### Parameters
-| Paremeter | Type | Description | 
+| Parameter | Type | Description | 
 | ----------- | ------------ | ----------- |
 | `location` | `string` | The location for data to be added to `ProfileTemplate`. Locations should be separated using periods. |
 | `value` | `any` | The data to be added at `location`. |
