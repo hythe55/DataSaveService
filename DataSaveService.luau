@@ -3,6 +3,9 @@ local ORDERED_DATA_UPDATE_INTERVAL = 10
 
 local RunService = game:GetService("RunService")
 local DataStoreService = game:GetService("DataStoreService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local number = require(ReplicatedStorage.Libraries.number)
 
 local IsServer = RunService:IsServer()
 
@@ -145,52 +148,48 @@ Example: Information.DataStore or Information.Data Store]]
 function DataSaveService:BindToOrderedDataStore(index: string, name: string, scope: string?)
 	assert(ProfileTemplate, "[DataSaveService]: Profile template must be created before calling BindToOrderedDataStore")
 	local orderedDataStore = DataStoreService:GetOrderedDataStore(name, scope)
-	
+
 	local function getIndex(profile: Profile)
 		local previous = profile
 		local currentLocation = profile.Data
 		for i,v in string.split(index, ".") do
-			print(currentLocation, v, currentLocation[v])
 			if currentLocation[v] then
 				previous = currentLocation
 				currentLocation = currentLocation[v]
 				continue
 			end
 		end
-		print(currentLocation)
 		return previous
 	end
-	
+
 	local function getData(profile: Profile)
 		local currentLocation = profile.Data
 		for i,v in string.split(index, ".") do
-			print(currentLocation, v, currentLocation[v])
 			if currentLocation[v] then
 				currentLocation = currentLocation[v]
 				continue
 			end
 		end
-		print(currentLocation)
 		return currentLocation
 	end
-	
+
 	local function update(player: Player)
-		print('checking for updates')
 		local profile = DataSaveService:GetProfile(player)
 		getIndex(profile).Changed:Connect(function()
-			print('changed')
-		--profile.Data[index].Changed:Connect(function()
+			--profile.Data[index].Changed:Connect(function()
 			local data = getData(profile)
 			task.wait(ORDERED_DATA_UPDATE_INTERVAL)
 			if not player then return end
-			if data == getData(profile) then
+			if data ~= getData(profile) then
+				local compressed = number.compress(data)
 				local success, err
 				local tries = 0
 				repeat
 					success, err = pcall(function()
-						orderedDataStore:SetAsync(tostring(player.UserId), data)
+						return orderedDataStore:SetAsync(tostring(player.UserId), compressed)
 					end)
 					tries += 1
+					task.wait(0.1)
 				until success or tries == 10
 				if tries == 10 then
 					warn("[DataSaveService]: Failed to update OrderedDataStore ".. name.. " Error: ".. err)
