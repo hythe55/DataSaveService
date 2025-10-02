@@ -156,6 +156,22 @@ Template = {
 #### Returns
 `nil`
 
+### BindToOrderedDataStore
+Binds the provided `index` of `Profile.Data` to an `OrderedDataStore`. Automatically updates periodically based on the `ORDERED_DATA_UPDATE_INTERVAL` setting.
+
+#### Parameters
+| Parameter | Type | Description | 
+| ----------- | ----------- | ----------- |
+| `index` | `string` | The index of `Profile.Data` to bind the `OrderedDataStore` to. |
+| `name` | `string` | The name the `OrderedDataStore` should use. |
+| `scope` | `string?` | The scope the `OrderedDataStore` should use. |
+
+### Returns
+`nil`
+
+### ResetProfile
+Resets `Profile.Data` to the original `ProfileTemplate`.
+
 ## Events
 ### ProfileAdded
 ```

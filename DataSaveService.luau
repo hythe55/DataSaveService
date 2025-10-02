@@ -1,8 +1,11 @@
+local DEBUG = false --this will create a fresh testing profile that resets each time the playtest ends
+
 --SETTINGS
-local ORDERED_DATA_UPDATE_INTERVAL = 10
+local ORDERED_DATA_UPDATE_INTERVAL = 120
 
 local RunService = game:GetService("RunService")
 local DataStoreService = game:GetService("DataStoreService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local IsServer = RunService:IsServer()
 
@@ -119,6 +122,13 @@ function DataSaveService:GetProfile(player: Player): Profile?
 	end
 end
 
+--[[
+Resets a profile to the template.
+]]
+function DataSaveService:ResetProfile(profile: Profile)
+	profile.Data = DataSaveService:GetTemplate()
+end
+
 --[[Sets the template the Profile will use.]]
 function DataSaveService:SetTemplate(template: {any})
 	assert(IsServer, "DataSaveService:SetTemplate() can only be called from the server.")
@@ -145,7 +155,7 @@ Example: Information.DataStore or Information.Data Store]]
 function DataSaveService:BindToOrderedDataStore(index: string, name: string, scope: string?)
 	assert(ProfileTemplate, "[DataSaveService]: Profile template must be created before calling BindToOrderedDataStore")
 	local orderedDataStore = DataStoreService:GetOrderedDataStore(name, scope)
-	
+
 	local function getIndex(profile: Profile)
 		local previous = profile
 		local currentLocation = profile.Data
@@ -158,7 +168,7 @@ function DataSaveService:BindToOrderedDataStore(index: string, name: string, sco
 		end
 		return previous
 	end
-	
+
 	local function getData(profile: Profile)
 		local currentLocation = profile.Data
 		for i,v in string.split(index, ".") do
@@ -169,10 +179,15 @@ function DataSaveService:BindToOrderedDataStore(index: string, name: string, sco
 		end
 		return currentLocation
 	end
-	
+
 	local function update(player: Player)
 		local profile = DataSaveService:GetProfile(player)
-		getIndex(profile).Changed:Connect(function()
+		--getIndex(profile).Changed:Connect(function()
+		while task.wait(120) do
+			if not player.Parent then
+				break
+			end
+			--profile.Data[index].Changed:Connect(function()
 			local data = getData(profile)
 			task.wait(ORDERED_DATA_UPDATE_INTERVAL)
 			if not player then return end
@@ -181,9 +196,13 @@ function DataSaveService:BindToOrderedDataStore(index: string, name: string, sco
 				local tries = 0
 				repeat
 					success, err = pcall(function()
-						orderedDataStore:SetAsync(tostring(player.UserId), data)
+						return orderedDataStore:SetAsync(tostring(player.UserId), tonumber(data))
 					end)
-					tries += 1
+					if not success then
+						tries += 1
+						task.wait(0.1)
+						warn("[DataSaveService]: ".. err)
+					end
 				until success or tries == 10
 				if tries == 10 then
 					warn("[DataSaveService]: Failed to update OrderedDataStore ".. name.. " Error: ".. err)
@@ -191,7 +210,7 @@ function DataSaveService:BindToOrderedDataStore(index: string, name: string, sco
 					--print("[DataSaveService]: Updated OrderedDataStore ".. name)
 				end
 			end
-		end)
+		end
 	end
 	for player in DataSaveService:GetProfiles() do
 		task.spawn(update, player)
@@ -233,7 +252,7 @@ Defaults to <strong>MAIN_PROFILE</strong>.]]
 function DataSaveService:SetProfileStoreName(storeName: string)
 	assert(IsServer, "DataSaveService:SetProfileStoreName() can only be called from the server.")
 	assert(typeof(storeName) == "string", "storeName must be a string.")
-	assert(ProfileStore, "DataSaveService:SetProfileStoreName must be called before DataSaveService:CreateProfileStore().")
+	assert(not ProfileStore, "DataSaveService:SetProfileStoreName must be called before DataSaveService:CreateProfileStore().")
 	ProfileName = storeName
 end
 
@@ -257,7 +276,9 @@ function DataSaveService:CreateProfileStore(): ProfileService.ProfileStore
 	assert(not ProfileStore, "DataSave has already been created.")
 	ProfileStore = ProfileService.New(ProfileName, ProfileTemplate)
 	local function loadProfile(player: Player)
-		local profile = ProfileStore:StartSessionAsync(DataSaveService:GetProfileKey(player.UserId), {
+		local key = if DEBUG then DataSaveService:GetProfileKey(player.UserId.. 1) else DataSaveService:GetProfileKey(player.UserId)
+
+		local profile = ProfileStore:StartSessionAsync(key, {
 			Cancel = function()
 				return player.Parent ~= Players
 			end,
@@ -278,6 +299,11 @@ function DataSaveService:CreateProfileStore(): ProfileService.ProfileStore
 			profile.OnSessionEnd:Connect(function()
 				if DataSaveService:GetProfile(player) then
 					script.Communication.ProfileRemoving:Fire(player)
+					task.wait()
+					if DEBUG then
+						warn('Wiping profile data')
+						profile.Data = DataSaveService:GetTemplate()
+					end
 					ProfileTables[player].Data:Destroy()
 					Profiles[player]:EndSession()
 					ProfileTables[player]:EndSession()
