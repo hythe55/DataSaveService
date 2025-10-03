@@ -6,22 +6,22 @@ local ORDERED_DATA_UPDATE_INTERVAL = 120
 local RunService = game:GetService("RunService")
 local DataStoreService = game:GetService("DataStoreService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerStorage = game:GetService("ServerStorage")
+local ReplicationService = require(ReplicatedStorage.Services.ReplicationService)
+local DataSaveService = {}
+
+local Table = require(ReplicatedStorage.Classes.Table)
 
 local IsServer = RunService:IsServer()
 
-assert(IsServer, "Client side is not currently supported")
-
-local DataSaveService = {}
-local ServerStorage = game:GetService("ServerStorage")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Table = require(ReplicatedStorage.Classes.Table)
+--assert(IsServer, "Client side is not currently supported")
 
 if IsServer then
 	assert(ServerStorage:FindFirstChild("Services"), "ProfileStore must be a child of ServerStorage.Services")
 	assert(ServerStorage.Services:FindFirstChild("ProfileStore"), "ProfileStore must be a child of ServerStorage.Services")
+	ProfileService = require(ServerStorage.Services.ProfileStore)
 end
 
-local ProfileService = require(ServerStorage.Services.ProfileStore)
 local Players = game:GetService("Players")
 
 local ProfileTemplate: {}? = nil
@@ -30,6 +30,8 @@ local ProfileName = "MAIN_PROFILE"
 local ProfileKeyTemplate = "%s"
 local Profiles: {[Player]: ProfileService.Profile} = {}
 local ProfileTables: {[Player]: ProfileService.Profile} = {}
+
+local localProfile: Profile = nil
 
 script:SetAttribute("ProfileStoreCreated", false)
 
@@ -45,6 +47,7 @@ export type Profile = ProfileService.Profile
 
 --Creates communication folder and remote events
 local function startup()
+	if not IsServer then return end
 	local communication = Instance.new("Folder")
 	communication.Name = "Communication"
 	communication.Parent = script
@@ -58,43 +61,43 @@ local function startup()
 	profileRemoved.Name = "ProfileRemoved"
 	profileRemoved.Parent = communication
 	local requestProfile = Instance.new("RemoteEvent")
-	requestProfile.Name = "RequestProfile"
+	requestProfile.Name = "SendProfileToClient"
 	requestProfile.Parent = communication
 end
 
 --[[Waits for a profile to be loaded.
 Returns nil if player leaves before the profile is loaded.]]
 function DataSaveService:WaitForProfile(player: Player): Profile?
-	assert(IsServer, "DataSaveService:WaitForProfile() can only be called from the server.")
-	if not Players:FindFirstChild(player.Name) then
-		return
-	end
-	local playerLeft = false
-	local connection = Players.PlayerRemoving:Connect(function(playerLeaving)
-		if playerLeaving == player then
-			playerLeft = true
+	if IsServer then
+		assert("[DataSaveService]: Player parameter is required on the server")
+		if not Players:FindFirstChild(player.Name) then
+			return
 		end
-	end)
-	while not DataSaveService:GetProfile(player) do
-		task.wait(0.1) --disgusting but i can't think of another way to do this right now
-		if playerLeft then
-			break
+		while not DataSaveService:GetProfile(player) do
+			task.wait(0.1) --disgusting but i can't think of another way to do this right now
+			if not player.Parent then
+				break
+			end
 		end
+		return DataSaveService:GetProfile(player)
+	else
+		while not DataSaveService:GetProfile() do
+			task.wait(0.1)
+		end
+		return DataSaveService:GetProfile()
 	end
-	connection:Disconnect()
-	return DataSaveService:GetProfile(player)
 end
 
 --[[Returns the profile key for the given userId.]]
 function DataSaveService:GetProfileKey(userId: number): string
-	assert(IsServer, "DataSaveService:GetProfileKey() can only be called from the server.")
+	assert(IsServer, "[DataSaveService]: can only be called from the server")
 	return string.format(ProfileKeyTemplate, userId)
 end
 
 --[[Returns the profile store.
 Yields until DataSaveService:CreateProfileStore() is called.]]
 function DataSaveService:GetProfileStore(): ProfileService.ProfileStore
-	assert(IsServer, "DataSaveService:GetProfileStore() can only be called from the server.")
+	assert(IsServer, "[DataSaveService]: GetProfileStore can only be called from the server")
 	if script:GetAttribute("ProfileStoreCreated") == false then
 		script:GetAttributeChangedSignal("ProfileStoreCreated"):Wait()
 	end
@@ -103,22 +106,24 @@ end
 
 --[[Returns a dictionary of all profiles with <strong>player</strong> being used as the key.]]
 function DataSaveService:GetProfiles(): {[Player]: Profile}
-	assert(IsServer, "DataSaveService:GetProfiles() can only be called from the server.")
+	assert(IsServer, "[DataSaveService]: GetProfiles can only be called from the server")
 	return Profiles
 end
 
 --[[Returns the Profile for <strong>player</strong>
 Returns nil if no Profile is found]]
 function DataSaveService:GetProfile(player: Player): Profile?
-	assert(player:IsA("Player"), "player must be a Player.")
 	if IsServer then
+		assert(player:IsA("Player"), "[DataSaveService:] Player parameter must be provided on the server")
 		return ProfileTables[player]
 		--return Profiles[player]
 	else
-		script.Communication.RequestProfile:FireServer()
-		script.Communication.RequestProfile.OnClientEvent:Once(function(profile: Profile)
+		return localProfile
+		--return ReplicationService:RequestData(script.SendProfileToClient)
+		--return script.Communication.RequestProfile:InvokeServer()
+		--[[script.Communication.RequestProfile.OnClientEvent:Once(function(profile: Profile)
 			return profile
-		end)
+		end)]]
 	end
 end
 
@@ -126,19 +131,20 @@ end
 Resets a profile to the template.
 ]]
 function DataSaveService:ResetProfile(profile: Profile)
+	assert(IsServer, "[DataSaveService]: ResetProfile can only be called from the server")
 	profile.Data = DataSaveService:GetTemplate()
 end
 
 --[[Sets the template the Profile will use.]]
 function DataSaveService:SetTemplate(template: {any})
-	assert(IsServer, "DataSaveService:SetTemplate() can only be called from the server.")
+	assert(IsServer, "[DataSaveService]: SetTemplate can only be called from the server")
 	assert(typeof(template) == "table", "Template must be a table.")
 	ProfileTemplate = template
 end
 
 --[[Returns the template Profiles use.]]
 function DataSaveService:GetTemplate(): {any}
-	assert(ProfileTemplate, "Profile template has not been created.")
+	assert(ProfileTemplate, "[DataSaveService]: Profile template has not been created")
 	return ProfileTemplate
 end
 
@@ -153,6 +159,7 @@ end
 The index should be seperated by periods.
 Example: Information.DataStore or Information.Data Store]]
 function DataSaveService:BindToOrderedDataStore(index: string, name: string, scope: string?)
+	assert(IsServer, "[DataSaveService]: BindToOrderedDataStore must be called from the server")
 	assert(ProfileTemplate, "[DataSaveService]: Profile template must be created before calling BindToOrderedDataStore")
 	local orderedDataStore = DataStoreService:GetOrderedDataStore(name, scope)
 
@@ -225,7 +232,7 @@ The location should be seperated using peroids.
 If only the index name is provided in <strong>location</strong> the value with be placed directly into Template.
 More information can be found on the documentation.]]
 function DataSaveService:AddToTemplate(location: string, value: any)
-	assert(IsServer, "DataSaveService:AddToTemplate() can only be called from the server.")
+	assert(IsServer, "[DataSaveService]: AddToTemplate can only be called from the server")
 	while not ProfileTemplate do
 		task.wait(0.1)
 	end
@@ -250,9 +257,9 @@ end
 Must be called before DataSaveService:CreateProfileStore.
 Defaults to <strong>MAIN_PROFILE</strong>.]]
 function DataSaveService:SetProfileStoreName(storeName: string)
-	assert(IsServer, "DataSaveService:SetProfileStoreName() can only be called from the server.")
-	assert(typeof(storeName) == "string", "storeName must be a string.")
-	assert(not ProfileStore, "DataSaveService:SetProfileStoreName must be called before DataSaveService:CreateProfileStore().")
+	assert(IsServer, "[DataSaveService]: SetProfileStoreName can only be called from the server")
+	assert(typeof(storeName) == "string", "[DataSaveService]: storeName must be a string.")
+	assert(not ProfileStore, "[DataSaveService]: SetProfileStoreName must be called before CreateProfileStore")
 	ProfileName = storeName
 end
 
@@ -260,10 +267,10 @@ end
 Must include <strong>%s</strong>.
 <strong>%s</strong> will be replaced by the player's UserId.]]
 function DataSaveService:SetProfileKeyTemplate(keyTemplate: string)
-	assert(IsServer, "DataSaveService:SetProfileKeyTemplate() can only be called from the server.")
-	assert(ProfileStore, "ProfileKeyTemplate must be set DataSaveService:CreateProfileStore() is called.")
-	assert(typeof(keyTemplate) == "string", "keyTemplate must be a string.")
-	assert(string.find(keyTemplate, "%s"), "keyTemplate must contain '%s'.")
+	assert(IsServer, "[DataSaveService] SetProfileKeyTemplate can only be called from the server")
+	assert(ProfileStore, "[DataSaveService]: ProfileKeyTemplate must be set CreateProfileStore is called")
+	assert(typeof(keyTemplate) == "string", "[DataSaveService]: keyTemplate must be a string")
+	assert(string.find(keyTemplate, "%s"), "[DataSaveService]: keyTemplate must contain '%s'")
 	ProfileKeyTemplate = keyTemplate
 end
 
@@ -271,9 +278,9 @@ local connection
 
 --[[Starts the module and automatically loads profiles.]]
 function DataSaveService:CreateProfileStore(): ProfileService.ProfileStore
-	assert(IsServer, "DataSaveService:CreateProfileStore() can only be called from the server.")
-	assert(ProfileTemplate, "Profile template has not be set using DataSaveService:SetTemplate().")
-	assert(not ProfileStore, "DataSave has already been created.")
+	assert(IsServer, "[DataSaveService] CreateProfileStore can only be called from the server")
+	assert(ProfileTemplate, "[DataSaveService]: Profile template has not be set using SetTemplate")
+	assert(not ProfileStore, "[DataSaveService]: ProfileStore has already been created")
 	ProfileStore = ProfileService.New(ProfileName, ProfileTemplate)
 	local function loadProfile(player: Player)
 		local key = if DEBUG then DataSaveService:GetProfileKey(player.UserId.. 1) else DataSaveService:GetProfileKey(player.UserId)
@@ -288,11 +295,12 @@ function DataSaveService:CreateProfileStore(): ProfileService.ProfileStore
 			profile:AddUserId(player.UserId)
 			profile:Reconcile()
 
-			local tableProfile = table.clone(profile)
-			tableProfile.Data = Table.new(profile.Data)
+			local tableProfile = Table.new(table.clone(profile))
+			--tableProfile.Data = Table.new(profile.Data)
 			profile.Data = table.clone(tableProfile.Data:Serialize())
 			connection = tableProfile.Data.Changed:Connect(function()
-				profile.Data = table.clone(tableProfile.Data:Serialize())
+				--profile.Data = table.clone(tableProfile.Data:Serialize())
+				profile = table.clone(tableProfile:Serialize())
 				--profile.Data = table.clone(tableProfile.Data.Raw)
 			end)
 
@@ -306,7 +314,8 @@ function DataSaveService:CreateProfileStore(): ProfileService.ProfileStore
 					end
 					ProfileTables[player].Data:Destroy()
 					Profiles[player]:EndSession()
-					ProfileTables[player]:EndSession()
+					--ProfileTables[player]:EndSession()
+					ProfileTables[player]:Destroy()
 					Profiles[player] = nil
 					ProfileTables[player] = nil
 					script.Communication.ProfileRemoved:Fire(player)
@@ -319,6 +328,8 @@ function DataSaveService:CreateProfileStore(): ProfileService.ProfileStore
 				Profiles[player] = profile
 				ProfileTables[player] = tableProfile
 				print("Profile loaded for ".. player.DisplayName.. ".")
+				ReplicationService:Create(tableProfile, script:WaitForChild("Communication").SendProfileToClient, player)
+				
 				script.Communication.ProfileAdded:Fire(player)
 			else
 				--Player left before Profile loaded
@@ -333,6 +344,8 @@ function DataSaveService:CreateProfileStore(): ProfileService.ProfileStore
 		--local profile = DataSaveService:GetProfile(player)
 		local profile = Profiles[player]
 		if profile then
+			ReplicationService:Clear(script:WaitForChild("Communication").SendProfileToClient, player)
+			
 			DataSaveService:GetProfile(player).Data:ClearConnections()
 			profile:EndSession() --i believe as long as not a crash .OnSessionEnd runs
 
@@ -373,8 +386,36 @@ end]]
 startup()
 
 if IsServer then
-	script.Communication.RequestProfile.OnServerEvent:Connect(function(player: Player)
+	--[[script.Communication.RequestProfile.OnServerInvoke = function(player: Player)
 		return DataSaveService:GetProfile(player)
+	end]]
+else
+	ReplicationService:Listen(script:WaitForChild("Communication").SendProfileToClient, function(profile: Profile)
+		local function update(data: {}, profileIndex)
+			for i,v in data do
+				if i == "Changed" or i == "IsFrozen" or i == "Parent" then
+					--i dont think i actually need this because i think mt in table handles it
+					continue
+				elseif typeof(data[i]) == "table" then
+					update(data[i], profileIndex[i])
+				else
+					data[i] = profileIndex[i]
+				end
+			end
+		end
+		
+		if localProfile then
+			update(localProfile, profile)
+			--[[for i,v in localProfile do
+				if i == "Changed" or i == "IsFrozen" or i == "Parent" then
+					continue
+				end
+				print(i)
+				localProfile[i] = profile[i]
+			end]]
+		else
+			localProfile = profile
+		end
 	end)
 end
 
